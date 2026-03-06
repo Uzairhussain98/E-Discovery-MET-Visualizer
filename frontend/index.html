@@ -5,6 +5,8 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -12,17 +14,64 @@
 
 <input type="file" id="fileInput" />
 <button onclick="uploadFile()">Upload</button>
+<!-- <input type="text" id="mimeFilter" placeholder="Filter by MIME type">
+<p id="status"></p> -->
 
-<table id="resultTable" class="display">
+<!-- <table id="resultTable" class="display">
     <thead>
         <tr>
             <th>File ID</th>
             <th>MIME Type</th>
-            <th>Location</th>
+            <th>Size</th>
+            <th>Checksum</th>
+            <th>Checksum Type</th>
         </tr>
-    </thead>
+        </thead>
     <tbody></tbody>
+</table> -->
+
+<h2>Files Metadata</h2>
+
+<table id="resultTable" class="display">
+<thead>
+<tr>
+<th>File ID</th>
+<th>MIME Type</th>
+<th>Size</th>
+<th>Checksum</th>
+<th>Checksum Type</th>
+<th>File Location</th>
+</tr>
+</thead>
+<tbody></tbody>
 </table>
+
+
+<h2>Collection Structure (structMap)</h2>
+
+<table id="structureTable" class="display">
+<thead>
+<tr>
+<th>Order</th>
+<th>Division ID</th>
+<th>File Name</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<h2>File Type Distribution</h2>
+<div class="chart-container">
+    <canvas id="fileTypeChart"></canvas>
+</div>
+<h2>Collection Summary</h2>
+
+<div id="summaryReport">
+<p>Total Files: <span id="totalFiles"></span></p>
+<p>Files with Checksums: <span id="filesWithChecksum"></span></p>
+<p>Checksum Algorithm: <span id="checksumAlgo"></span></p>
+<p>Missing Hashes: <span id="missingHashes"></span></p>
+</div>
 
 <script src="script.js"></script>
 

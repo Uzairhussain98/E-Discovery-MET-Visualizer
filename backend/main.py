@@ -13,7 +13,9 @@ app.add_middleware(
 )
 
 @app.post("/upload/")
-async def upload_mets(file: UploadFile = File(...)):
+async def upload_mets(file: UploadFile):
+
     content = await file.read()
-    parsed_data = parse_mets(content)
-    return parsed_data
+    result = parse_mets(content)
+
+    return result
