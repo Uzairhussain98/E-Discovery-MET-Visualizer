@@ -2,37 +2,96 @@
 <html>
 <head>
     <title>METS Visualizer</title>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet"
+    href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
-<h2>METS XML Viewer</h2>
+<nav class="navbar">
+    <div class="logo">METS Dashboard</div>
 
-<input type="file" id="fileInput" />
-<button onclick="uploadFile()">Upload</button>
-<!-- <input type="text" id="mimeFilter" placeholder="Filter by MIME type">
-<p id="status"></p> -->
+    <div class="nav-links">
+        <!-- <a href="#">Upload</a> -->
+        <a href="#fileTypeDis">Analytics</a>
+        <a href="#resultTable">Metadata</a>
+        <a href="#structureTable">Structure</a>
+        <!-- <a href="#fileTypeDis">Analytics</a> -->
+    </div>
+</nav>
 
-<!-- <table id="resultTable" class="display">
-    <thead>
-        <tr>
-            <th>File ID</th>
-            <th>MIME Type</th>
-            <th>Size</th>
-            <th>Checksum</th>
-            <th>Checksum Type</th>
-        </tr>
-        </thead>
-    <tbody></tbody>
-</table> -->
+<div class="container">
+
+<!-- Upload Panel -->
+
+<div class="card upload-card">
+
+    <h2>Upload METS File</h2>
+
+    <div class="upload-controls">
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Upload</button>
+    </div>
+
+</div>
+
+
+<!-- Summary Dashboard -->
+
+<div class="summary-grid">
+
+    <div class="summary-card">
+        <h3>Total Files</h3>
+        <p id="totalFiles">0</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Files With Checksums</h3>
+        <p id="filesWithChecksum">0</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Checksum Algorithm</h3>
+        <p id="checksumAlgo">-</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Missing Hashes</h3>
+        <p id="missingHashes">0</p>
+    </div>
+
+</div>
+
+
+<!-- Chart -->
+
+<div class="card">
+
+<h2>File Type Distribution</h2>
+
+<div id="fileTypeDis" class="chart-container">
+    <canvas id="fileTypeChart"></canvas>
+</div>
+
+</div>
+
+
+<!-- Files Table -->
+
+<div class="card">
 
 <h2>Files Metadata</h2>
 
 <table id="resultTable" class="display">
+
 <thead>
 <tr>
 <th>File ID</th>
@@ -43,13 +102,22 @@
 <th>File Location</th>
 </tr>
 </thead>
+
 <tbody></tbody>
+
 </table>
 
+</div>
+
+
+<!-- Structure Table -->
+
+<div class="card">
 
 <h2>Collection Structure (structMap)</h2>
 
 <table id="structureTable" class="display">
+
 <thead>
 <tr>
 <th>Order</th>
@@ -57,20 +125,13 @@
 <th>File Name</th>
 </tr>
 </thead>
+
 <tbody></tbody>
+
 </table>
 
-<h2>File Type Distribution</h2>
-<div class="chart-container">
-    <canvas id="fileTypeChart"></canvas>
 </div>
-<h2>Collection Summary</h2>
 
-<div id="summaryReport">
-<p>Total Files: <span id="totalFiles"></span></p>
-<p>Files with Checksums: <span id="filesWithChecksum"></span></p>
-<p>Checksum Algorithm: <span id="checksumAlgo"></span></p>
-<p>Missing Hashes: <span id="missingHashes"></span></p>
 </div>
 
 <script src="script.js"></script>
