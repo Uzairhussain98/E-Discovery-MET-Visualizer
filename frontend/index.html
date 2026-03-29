@@ -20,36 +20,47 @@
     <div class="logo">METS Dashboard</div>
 
     <div class="nav-links">
-        <!-- <a href="#">Upload</a> -->
         <a href="#fileTypeDis">Analytics</a>
         <a href="#resultTable">Metadata</a>
         <a href="#structureTable">Structure</a>
-        <!-- <a href="#fileTypeDis">Analytics</a> -->
     </div>
 </nav>
 
 <div class="container">
 
-<!-- Upload Panel -->
-
 <div class="card upload-card">
 
-    <h2>Upload METS File</h2>
+    <h2>Upload METS Files</h2>
+    <p class="upload-help">Choose one file, multiple files, or a folder full of XML/METS documents.</p>
 
     <div class="upload-controls">
-        <input type="file" id="fileInput">
+        <input type="file" id="fileInput" multiple accept=".xml,.mets,text/xml,application/xml" hidden>
+        <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+        <button type="button" onclick="document.getElementById('fileInput').click()">Choose Files</button>
         <button onclick="uploadFile()">Upload</button>
+        <button type="button" class="secondary-button" onclick="document.getElementById('folderInput').click()">Choose Folder</button>
     </div>
 
+    <p id="uploadStatus" class="upload-status">No files loaded.</p>
+    <p id="selectionSummary" class="upload-selection">No files selected.</p>
+    <ul id="selectedFilesList" class="selected-files-list"></ul>
+
 </div>
-
-
-<!-- Summary Dashboard -->
 
 <div class="summary-grid">
 
     <div class="summary-card">
-        <h3>Total Files</h3>
+        <h3>METS Documents</h3>
+        <p id="totalUploads">0</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Parsed Documents</h3>
+        <p id="parsedUploads">0</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Repository Files</h3>
         <p id="totalFiles">0</p>
     </div>
 
@@ -59,7 +70,7 @@
     </div>
 
     <div class="summary-card">
-        <h3>Checksum Algorithm</h3>
+        <h3>Checksum Algorithms</h3>
         <p id="checksumAlgo">-</p>
     </div>
 
@@ -68,10 +79,26 @@
         <p id="missingHashes">0</p>
     </div>
 
+    <div class="summary-card">
+        <h3>Structure Entries</h3>
+        <p id="totalStructureEntries">0</p>
+    </div>
+
+    <div class="summary-card">
+        <h3>Failed Documents</h3>
+        <p id="failedUploads">0</p>
+    </div>
+
 </div>
 
+<div class="card">
 
-<!-- Chart -->
+<h2>Upload Results</h2>
+<ul id="documentStatusList" class="document-status-list">
+    <li>No upload results yet.</li>
+</ul>
+
+</div>
 
 <div class="card">
 
@@ -83,9 +110,6 @@
 
 </div>
 
-
-<!-- Files Table -->
-
 <div class="card">
 
 <h2>Files Metadata</h2>
@@ -94,6 +118,7 @@
 
 <thead>
 <tr>
+<th>Source METS</th>
 <th>File ID</th>
 <th>MIME Type</th>
 <th>Size</th>
@@ -109,9 +134,6 @@
 
 </div>
 
-
-<!-- Structure Table -->
-
 <div class="card">
 
 <h2>Collection Structure (structMap)</h2>
@@ -120,6 +142,7 @@
 
 <thead>
 <tr>
+<th>Source METS</th>
 <th>Order</th>
 <th>Division ID</th>
 <th>File Name</th>

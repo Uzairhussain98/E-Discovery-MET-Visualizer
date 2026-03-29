@@ -95,3 +95,25 @@ def parse_mets(file_content):
         "files": documents,
         "structure": structure
     }
+
+
+def parse_mets_document(file_name, file_content):
+    try:
+        parsed = parse_mets(file_content)
+        parsed["source_file"] = file_name
+        parsed["error"] = None
+        return parsed
+    except etree.XMLSyntaxError as exc:
+        return {
+            "source_file": file_name,
+            "files": [],
+            "structure": [],
+            "error": f"Invalid XML: {exc}"
+        }
+    except Exception as exc:
+        return {
+            "source_file": file_name,
+            "files": [],
+            "structure": [],
+            "error": f"Unable to parse METS: {exc}"
+        }
