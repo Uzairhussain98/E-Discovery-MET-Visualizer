@@ -19,10 +19,23 @@ app.add_middleware(
 @app.post("/upload/")
 async def upload_mets(files: list[UploadFile] = File(...)):
     parsed_documents = []
+    uploaded_binary_files = {}
+    mets_files = []
 
     for file in files:
         content = await file.read()
-        parsed_documents.append(parse_mets_document(file.filename, content))
+        file_name = file.filename or ""
+        lower_name = file_name.lower()
+
+        if lower_name.endswith(".xml") or lower_name.endswith(".mets"):
+            mets_files.append((file_name, content))
+        else:
+            uploaded_binary_files[file_name] = content
+
+    for file_name, content in mets_files:
+        parsed_documents.append(
+            parse_mets_document(file_name, content, uploaded_binary_files=uploaded_binary_files)
+        )
 
     total_file_entries = sum(len(document["files"]) for document in parsed_documents)
     total_struct_entries = sum(len(document["structure"]) for document in parsed_documents)

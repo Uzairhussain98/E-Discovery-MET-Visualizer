@@ -1,5 +1,7 @@
 let fileTypeChart;
 let pendingFiles = [];
+let parsedFileEntries = [];
+let metadataMap;
 
 async function uploadFile() {
     const statusEl = document.getElementById("uploadStatus");
@@ -19,17 +21,24 @@ async function uploadFile() {
         return;
     }
 
-    statusEl.textContent = `Uploading ${xmlFiles.length} file(s)...`;
+    statusEl.textContent = `Uploading ${pendingFiles.length} selected file(s) including ${xmlFiles.length} METS document(s)...`;
 
     const formData = new FormData();
-    xmlFiles.forEach(file => {
+    pendingFiles.forEach(file => {
         formData.append("files", file, file.webkitRelativePath || file.name);
     });
 
-    const response = await fetch("http://127.0.0.1:8000/upload/", {
-        method: "POST",
-        body: formData
-    });
+    let response;
+
+    try {
+        response = await fetch("http://127.0.0.1:8000/upload/", {
+            method: "POST",
+            body: formData
+        });
+    } catch (error) {
+        statusEl.textContent = "Upload failed. Please check that the backend server is running.";
+        return;
+    }
 
     if (!response.ok) {
         statusEl.textContent = "Upload failed. Please try again.";
@@ -51,6 +60,8 @@ async function uploadFile() {
             source_file: document.source_file
         }))
     );
+
+    parsedFileEntries = files;
 
     renderDocumentStatus(documents);
     renderFilesTable(files);
@@ -123,6 +134,7 @@ function renderFilesTable(files) {
     fileTable.clear();
 
     files.forEach(item => {
+        const fileKey = buildFileKey(item);
         fileTable.row.add([
             item.source_file || "",
             item.file_id || "",
@@ -130,7 +142,8 @@ function renderFilesTable(files) {
             item.size || "",
             item.checksum || "",
             item.checksum_type || "",
-            item.file_location || ""
+            item.file_location || "",
+            `<button type="button" class="metadata-trigger" data-file-key="${escapeHtml(fileKey)}">View Metadata</button>`
         ]);
     });
 
@@ -223,6 +236,122 @@ function renderFileTypeChart(files) {
     });
 }
 
+function buildFileKey(item) {
+    return `${item.source_file || ""}::${item.file_id || ""}`;
+}
+
+function openMetadataModal(fileEntry) {
+    const modal = document.getElementById("metadataModal");
+    const body = document.getElementById("metadataModalBody");
+    const mapSection = document.getElementById("metadataMapSection");
+    const imageMetadata = fileEntry.image_metadata;
+
+    const blocks = [
+        createMetadataCard("Source METS", fileEntry.source_file),
+        createMetadataCard("File ID", fileEntry.file_id),
+        createMetadataCard("File Location", fileEntry.file_location),
+        createMetadataCard("MIME Type", fileEntry.mime_type),
+        createMetadataCard("Size", fileEntry.size || "Not provided"),
+        createMetadataCard("Checksum", fileEntry.checksum || "Not provided"),
+        createMetadataCard("Checksum Type", fileEntry.checksum_type || "Not provided")
+    ];
+
+    if (!imageMetadata) {
+        blocks.push(createMetadataNote("No image file was uploaded for this METS reference, so EXIF metadata is unavailable."));
+    } else if (!imageMetadata.available) {
+        blocks.push(createMetadataNote(imageMetadata.error || "Image metadata could not be read."));
+    } else {
+        blocks.push(`
+            <div class="metadata-grid">
+                ${createMetadataCard("Image Format", imageMetadata.format || "Unknown")}
+                ${createMetadataCard("Dimensions", formatDimensions(imageMetadata))}
+                ${createMetadataCard("Camera Make", imageMetadata.camera_make || "Not available")}
+                ${createMetadataCard("Camera Model", imageMetadata.camera_model || "Not available")}
+                ${createMetadataCard("Date Taken", imageMetadata.date_taken || "Not available")}
+                ${createMetadataCard("GPS Coordinates", formatGps(imageMetadata))}
+            </div>
+        `);
+    }
+
+    body.innerHTML = blocks.join("");
+
+    const hasGps = imageMetadata && imageMetadata.available && imageMetadata.has_gps;
+    mapSection.style.display = hasGps ? "block" : "none";
+
+    modal.style.display = "flex";
+    modal.setAttribute("aria-hidden", "false");
+
+    if (hasGps) {
+        renderMetadataMap(imageMetadata.gps_latitude, imageMetadata.gps_longitude, fileEntry.file_location || fileEntry.file_id);
+    } else if (metadataMap) {
+        metadataMap.remove();
+        metadataMap = null;
+    }
+}
+
+function closeMetadataModal() {
+    const modal = document.getElementById("metadataModal");
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+
+    if (metadataMap) {
+        metadataMap.remove();
+        metadataMap = null;
+    }
+}
+
+function renderMetadataMap(latitude, longitude, label) {
+    const mapContainer = document.getElementById("metadataMap");
+
+    if (typeof L === "undefined") {
+        mapContainer.innerHTML = "<p class=\"metadata-muted\">Map library failed to load, but GPS coordinates are available above.</p>";
+        return;
+    }
+
+    mapContainer.innerHTML = "";
+
+    if (metadataMap) {
+        metadataMap.remove();
+    }
+
+    metadataMap = L.map(mapContainer).setView([latitude, longitude], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(metadataMap);
+
+    L.marker([latitude, longitude]).addTo(metadataMap).bindPopup(escapeHtml(label || "Image location")).openPopup();
+
+    setTimeout(() => {
+        metadataMap.invalidateSize();
+    }, 0);
+}
+
+function createMetadataCard(label, value) {
+    return `<div class="metadata-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value || "Not available")}</span></div>`;
+}
+
+function createMetadataNote(message) {
+    return `<p class="metadata-muted">${escapeHtml(message)}</p>`;
+}
+
+function formatDimensions(imageMetadata) {
+    if (!imageMetadata.width || !imageMetadata.height) {
+        return "Not available";
+    }
+
+    return `${imageMetadata.width} x ${imageMetadata.height}`;
+}
+
+function formatGps(imageMetadata) {
+    if (!imageMetadata.has_gps) {
+        return "Not available";
+    }
+
+    return `${imageMetadata.gps_latitude}, ${imageMetadata.gps_longitude}`;
+}
+
 function escapeHtml(value) {
     return String(value)
         .replaceAll("&", "&amp;")
@@ -233,7 +362,19 @@ function escapeHtml(value) {
 }
 
 $(document).ready(function() {
-    $("#resultTable").DataTable();
+    $("#resultTable").DataTable({
+        columns: [
+            { title: "Source METS" },
+            { title: "File ID" },
+            { title: "MIME Type" },
+            { title: "Size" },
+            { title: "Checksum" },
+            { title: "Checksum Type" },
+            { title: "File Location" },
+            { title: "Metadata", orderable: false, searchable: false }
+        ]
+    });
+
     $("#structureTable").DataTable();
 
     document.getElementById("fileInput").addEventListener("change", event => {
@@ -242,5 +383,30 @@ $(document).ready(function() {
 
     document.getElementById("folderInput").addEventListener("change", event => {
         mergeSelectedFiles(event.target.files, false);
+    });
+
+    $("#resultTable").on("click", ".metadata-trigger", function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const fileKey = this.dataset.fileKey || "";
+        const fileEntry = parsedFileEntries.find(item => buildFileKey(item) === fileKey);
+
+        if (fileEntry) {
+            openMetadataModal(fileEntry);
+        }
+    });
+
+    document.getElementById("closeMetadataModal").addEventListener("click", closeMetadataModal);
+    document.getElementById("metadataModal").addEventListener("click", event => {
+        if (event.target.dataset.closeModal === "true") {
+            closeMetadataModal();
+        }
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeMetadataModal();
+        }
     });
 });
