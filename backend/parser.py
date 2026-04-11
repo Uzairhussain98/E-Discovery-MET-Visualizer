@@ -143,6 +143,168 @@ def extract_image_metadata(file_content):
         }
 
 
+def get_trimmed_text(node):
+    if node is None:
+        return None
+
+    text = " ".join(part.strip() for part in node.itertext() if part and part.strip())
+    return text or None
+
+
+def get_local_name(node):
+    if node is None or not hasattr(node, "tag") or not isinstance(node.tag, str):
+        return None
+
+    if "}" in node.tag:
+        return node.tag.split("}", 1)[1]
+
+    return node.tag
+
+
+def summarize_xml_node(node, limit=8):
+    if node is None:
+        return []
+
+    summary = []
+
+    for child in node:
+        if not hasattr(child, "tag") or not isinstance(child.tag, str):
+            continue
+
+        label = get_local_name(child) or "value"
+        value = get_trimmed_text(child)
+
+        if value:
+            summary.append({
+                "label": label,
+                "value": value
+            })
+
+        if len(summary) >= limit:
+            break
+
+    if not summary:
+        value = get_trimmed_text(node)
+        if value:
+            summary.append({
+                "label": get_local_name(node) or "value",
+                "value": value
+            })
+
+    return summary[:limit]
+
+
+def parse_structmap_div(node, depth=0):
+    div_id = node.get("ID")
+    order = node.get("ORDER")
+    label = node.get("LABEL")
+    div_type = node.get("TYPE")
+
+    fptrs = []
+    for fptr in node.findall("mets:fptr", namespaces=node.nsmap):
+        file_id = fptr.get("FILEID")
+        if file_id:
+            fptrs.append(file_id)
+
+    children = []
+    for child_div in node.findall("mets:div", namespaces=node.nsmap):
+        children.append(parse_structmap_div(child_div, depth=depth + 1))
+
+    return {
+        "division_id": div_id,
+        "order": order,
+        "label": label,
+        "type": div_type,
+        "depth": depth,
+        "file_ids": fptrs,
+        "children": children
+    }
+
+
+def flatten_structmap_tree(tree_node, structmap_id=None, structmap_type=None):
+    flat_entries = []
+
+    for file_id in tree_node.get("file_ids", []):
+        flat_entries.append({
+            "division_id": tree_node.get("division_id"),
+            "order": tree_node.get("order"),
+            "label": tree_node.get("label"),
+            "file_id": file_id,
+            "structmap_id": structmap_id,
+            "structmap_type": structmap_type
+        })
+
+    for child in tree_node.get("children", []):
+        flat_entries.extend(
+            flatten_structmap_tree(child, structmap_id=structmap_id, structmap_type=structmap_type)
+        )
+
+    return flat_entries
+
+
+def extract_provenance(tree, ns):
+    mets_header = tree.find("mets:metsHdr", namespaces=ns)
+    agents = []
+
+    if mets_header is not None:
+        for agent in mets_header.findall("mets:agent", namespaces=ns):
+            agents.append({
+                "name": get_trimmed_text(agent.find("mets:name", namespaces=ns)) or "Unnamed agent",
+                "role": agent.get("ROLE"),
+                "type": agent.get("TYPE"),
+                "other_type": agent.get("OTHERTYPE")
+            })
+
+    digiprov_sections = []
+    explicit_events = []
+
+    for digiprov in tree.xpath("//mets:digiprovMD", namespaces=ns):
+        digiprov_id = digiprov.get("ID")
+        xml_data = digiprov.find(".//mets:xmlData", namespaces=ns)
+        section_summary = summarize_xml_node(xml_data if xml_data is not None else digiprov)
+
+        digiprov_sections.append({
+            "id": digiprov_id,
+            "summary": section_summary
+        })
+
+        for event in digiprov.xpath(".//*[local-name()='event']"):
+            def first_descendant_text(local_name):
+                node = event.xpath(f".//*[local-name()='{local_name}']")
+                return get_trimmed_text(node[0]) if node else None
+
+            explicit_events.append({
+                "identifier": first_descendant_text("eventIdentifierValue"),
+                "type": first_descendant_text("eventType"),
+                "date": first_descendant_text("eventDateTime"),
+                "detail": first_descendant_text("eventDetail"),
+                "agent_type": first_descendant_text("linkingAgentIdentifierType"),
+                "agent": first_descendant_text("linkingAgentIdentifierValue")
+            })
+
+        explicit_events = [
+            event for event in explicit_events
+            if any(event.get(key) for key in ("identifier", "type", "date", "detail", "agent"))
+        ]
+
+    return {
+        "header": {
+            "created_date": mets_header.get("CREATEDATE") if mets_header is not None else None,
+            "last_modified_date": mets_header.get("LASTMODDATE") if mets_header is not None else None,
+            "record_status": mets_header.get("RECORDSTATUS") if mets_header is not None else None
+        },
+        "agents": agents,
+        "digiprov_sections": digiprov_sections,
+        "explicit_events": explicit_events,
+        "has_explicit_chain_of_custody": len(explicit_events) > 0,
+        "note": (
+            "Explicit custody-style events were found in digiprovMD."
+            if explicit_events
+            else "No explicit chain-of-custody events were found. METS often includes creator/provenance clues, but many organizations do not record a full custody trail in the METS itself."
+        )
+    }
+
+
 def parse_mets(file_content):
     tree = etree.XML(file_content)
 
@@ -164,6 +326,7 @@ def parse_mets(file_content):
     }
 
     documents = []
+    provenance = extract_provenance(tree, ns)
 
     # ----------------------------
     # Build checksum lookup table
@@ -215,33 +378,37 @@ def parse_mets(file_content):
         })
 
     # ----------------------------
-    # Parse structMap (logical structure)
+    # Parse structMap hierarchy
     # ----------------------------
     structure = []
+    structure_tree = []
 
-    for div in tree.xpath("//mets:structMap//mets:div[mets:fptr]", namespaces=ns):
+    for struct_map in tree.xpath("//mets:structMap", namespaces=ns):
+        root_divs = struct_map.findall("mets:div", namespaces=ns)
+        root_nodes = [parse_structmap_div(root_div) for root_div in root_divs]
+        structmap_id = struct_map.get("ID")
+        structmap_type = struct_map.get("TYPE")
 
-        div_id = div.get("ID")
-        order = div.get("ORDER")
-        label = div.get("LABEL")
+        structure_tree.append({
+            "structmap_id": structmap_id,
+            "structmap_type": structmap_type,
+            "roots": root_nodes
+        })
 
-        fptr = div.find("mets:fptr", namespaces=ns)
-
-        file_id = None
-        if fptr is not None:
-            file_id = fptr.get("FILEID")
-
-        if file_id:
-            structure.append({
-                "division_id": div_id,
-                "order": order,
-                "label": label,
-                "file_id": file_id
-            })
+        for root_node in root_nodes:
+            structure.extend(
+                flatten_structmap_tree(
+                    root_node,
+                    structmap_id=structmap_id,
+                    structmap_type=structmap_type
+                )
+            )
 
     return {
         "files": documents,
-        "structure": structure
+        "structure": structure,
+        "structure_tree": structure_tree,
+        "provenance": provenance
     }
 
 
@@ -262,6 +429,8 @@ def parse_mets_document(file_name, file_content, uploaded_binary_files=None):
             "source_file": file_name,
             "files": [],
             "structure": [],
+            "structure_tree": [],
+            "provenance": None,
             "error": f"Invalid XML: {exc}"
         }
     except Exception as exc:
@@ -269,5 +438,7 @@ def parse_mets_document(file_name, file_content, uploaded_binary_files=None):
             "source_file": file_name,
             "files": [],
             "structure": [],
+            "structure_tree": [],
+            "provenance": None,
             "error": f"Unable to parse METS: {exc}"
         }

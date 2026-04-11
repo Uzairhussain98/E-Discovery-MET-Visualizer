@@ -33,6 +33,7 @@
     <div class="nav-links">
         <a href="#fileTypeDis">Analytics</a>
         <a href="#resultTable">Metadata</a>
+        <a href="#structureTreeSection">Tree</a>
         <a href="#structureTable">Structure</a>
     </div>
 </nav>
@@ -113,6 +114,16 @@
 
 <div class="card">
 
+<h2>Provenance / Chain of Custody</h2>
+<p class="table-help">This section shows explicit custody-style events when a METS package includes them, and otherwise falls back to header-level provenance clues such as creators and record dates.</p>
+<div id="provenanceSection" class="provenance-section">
+    <p class="metadata-muted">Upload a METS document to inspect provenance details.</p>
+</div>
+
+</div>
+
+<div class="card">
+
 <h2>File Type Distribution</h2>
 
 <div id="fileTypeDis" class="chart-container">
@@ -149,6 +160,16 @@
 
 <div class="card">
 
+<h2>Structure Tree</h2>
+<p class="table-help">Explore each structMap as an expandable hierarchy. Click any branch to reveal nested divisions and linked files.</p>
+<div id="structureTreeSection" class="structure-tree-section">
+    <p class="metadata-muted">Upload a METS document to view its hierarchical structMap tree.</p>
+</div>
+
+</div>
+
+<div class="card">
+
 <h2>Collection Structure (structMap)</h2>
 
 <table id="structureTable" class="display">
@@ -156,6 +177,7 @@
 <thead>
 <tr>
 <th>Source METS</th>
+<th>Map Type</th>
 <th>Order</th>
 <th>Division ID</th>
 <th>File Name</th>

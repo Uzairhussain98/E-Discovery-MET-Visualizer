@@ -174,6 +174,245 @@ html {
     margin-bottom: 4px;
 }
 
+.provenance-section {
+    display: grid;
+    gap: 16px;
+}
+
+.structure-tree-section {
+    display: grid;
+    gap: 18px;
+}
+
+.structure-tree-card {
+    border: 1px solid #dbe4f0;
+    border-radius: 18px;
+    padding: 20px;
+    background:
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 32%),
+        linear-gradient(180deg, #fbfdff 0%, #f6faff 100%);
+}
+
+.structure-tree-header h3 {
+    margin: 0 0 6px;
+}
+
+.structure-tree-maps {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.structmap-panel {
+    border: 1px solid #d7e3f4;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.84);
+    overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.structmap-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    background: transparent;
+    color: #0f172a;
+    text-align: left;
+}
+
+.structmap-toggle:hover {
+    background: rgba(219, 234, 254, 0.48);
+}
+
+.structmap-toggle-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.structmap-toggle-copy strong {
+    font-size: 15px;
+}
+
+.structmap-toggle-copy span {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.structmap-chevron {
+    width: 12px;
+    height: 12px;
+    border-right: 2px solid #2563eb;
+    border-bottom: 2px solid #2563eb;
+    transform: rotate(45deg);
+    transition: transform 0.22s ease;
+    flex-shrink: 0;
+}
+
+.structmap-panel.is-open .structmap-chevron {
+    transform: rotate(225deg);
+}
+
+.structmap-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.28s ease;
+}
+
+.structmap-panel.is-open .structmap-body {
+    grid-template-rows: 1fr;
+}
+
+.tree-root {
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 18px 18px 18px;
+}
+
+.tree-node {
+    position: relative;
+}
+
+.tree-node-children {
+    margin-left: 18px;
+    padding-left: 18px;
+    border-left: 1px dashed #bfd2eb;
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.22s ease, opacity 0.22s ease;
+    opacity: 1;
+}
+
+.tree-node-children > * {
+    min-height: 0;
+}
+
+.tree-node-branch:not(.is-open) > .tree-node-children {
+    grid-template-rows: 0fr;
+    opacity: 0.45;
+    overflow: hidden;
+}
+
+.tree-node-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.tree-node-toggle {
+    cursor: pointer;
+    border-radius: 10px;
+    padding-left: 8px;
+    margin-left: -8px;
+    transition: background 0.18s ease;
+}
+
+.tree-node-toggle:hover,
+.tree-node-toggle:focus-visible {
+    background: rgba(219, 234, 254, 0.52);
+    outline: none;
+}
+
+.tree-node-caret {
+    width: 10px;
+    height: 10px;
+    margin-top: 6px;
+    border-right: 2px solid #1d4ed8;
+    border-bottom: 2px solid #1d4ed8;
+    transform: rotate(45deg);
+    transition: transform 0.18s ease;
+    flex-shrink: 0;
+}
+
+.tree-node-branch.is-open > .tree-node-row .tree-node-caret {
+    transform: rotate(225deg);
+}
+
+.tree-node-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #93c5fd;
+    margin-top: 7px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.18);
+}
+
+.tree-node-dot-file {
+    background: #0f766e;
+    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+}
+
+.tree-node-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.tree-node-copy strong {
+    color: #0f172a;
+}
+
+.tree-node-copy span {
+    color: #64748b;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.provenance-card {
+    border: 1px solid #dbe4f0;
+    border-radius: 14px;
+    padding: 18px;
+    background: #f8fbff;
+}
+
+.provenance-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.provenance-card-header h3,
+.provenance-card h4 {
+    margin: 0;
+}
+
+.provenance-card h4 {
+    margin-top: 16px;
+    margin-bottom: 10px;
+    color: #334155;
+}
+
+.provenance-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.provenance-badge-present {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.provenance-badge-missing {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.provenance-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
 .status-success {
     color: #166534;
 }
@@ -296,7 +535,21 @@ html {
         padding: 18px;
     }
 
+    .provenance-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .metadata-map {
         height: 220px;
+    }
+
+    .tree-root {
+        padding: 0 12px 14px 12px;
+    }
+
+    .tree-node-children {
+        margin-left: 10px;
+        padding-left: 12px;
     }
 }

@@ -60,11 +60,18 @@ async function uploadFile() {
             source_file: document.source_file
         }))
     );
+    const structureTrees = documents.map(document => ({
+        source_file: document.source_file,
+        error: document.error,
+        structure_tree: document.structure_tree || []
+    }));
 
     parsedFileEntries = files;
 
     renderDocumentStatus(documents);
+    renderProvenanceSection(documents);
     renderFilesTable(files);
+    renderStructureTrees(files, structureTrees);
     renderStructureTable(files, structure);
     renderSummary(summary, files, structure);
     renderFileTypeChart(files);
@@ -129,6 +136,91 @@ function renderDocumentStatus(documents) {
     }).join("");
 }
 
+function renderProvenanceSection(documents) {
+    const section = document.getElementById("provenanceSection");
+
+    if (!documents.length) {
+        section.innerHTML = "<p class=\"metadata-muted\">Upload a METS document to inspect provenance details.</p>";
+        return;
+    }
+
+    const cards = documents.map(document => {
+        if (document.error) {
+            return `
+                <article class="provenance-card">
+                    <div class="provenance-card-header">
+                        <h3>${escapeHtml(document.source_file || "Unnamed file")}</h3>
+                        <span class="provenance-badge provenance-badge-missing">Parse failed</span>
+                    </div>
+                    <p class="metadata-muted">${escapeHtml(document.error)}</p>
+                </article>
+            `;
+        }
+
+        const provenance = document.provenance || {};
+        const header = provenance.header || {};
+        const agents = provenance.agents || [];
+        const events = provenance.explicit_events || [];
+        const digiprovSections = provenance.digiprov_sections || [];
+        const hasExplicitChain = !!provenance.has_explicit_chain_of_custody;
+
+        const headerCards = [
+            createMetadataCard("Created", header.created_date || "Not provided"),
+            createMetadataCard("Last Modified", header.last_modified_date || "Not provided"),
+            createMetadataCard("Record Status", header.record_status || "Not provided"),
+            createMetadataCard("digiprovMD Sections", String(digiprovSections.length))
+        ].join("");
+
+        const agentList = agents.length
+            ? `<div class="provenance-list">${agents.map(agent => `
+                <div class="metadata-item">
+                    <strong>${escapeHtml(agent.name || "Unnamed agent")}</strong>
+                    <span>${escapeHtml(formatAgent(agent))}</span>
+                </div>
+            `).join("")}</div>`
+            : `<p class="metadata-muted">No header agents were provided.</p>`;
+
+        const eventList = events.length
+            ? `<div class="provenance-list">${events.map(event => `
+                <div class="metadata-item">
+                    <strong>${escapeHtml(event.type || "Unlabeled event")}</strong>
+                    <span>${escapeHtml(formatEvent(event))}</span>
+                </div>
+            `).join("")}</div>`
+            : `<p class="metadata-muted">No explicit custody or preservation events were found in this METS document.</p>`;
+
+        const digiprovSummary = digiprovSections.length
+            ? `<div class="provenance-list">${digiprovSections.map(sectionItem => `
+                <div class="metadata-item">
+                    <strong>${escapeHtml(sectionItem.id || "digiprovMD")}</strong>
+                    <span>${escapeHtml(formatDigiprovSummary(sectionItem.summary || []))}</span>
+                </div>
+            `).join("")}</div>`
+            : `<p class="metadata-muted">No digiprovMD sections were found.</p>`;
+
+        return `
+            <article class="provenance-card">
+                <div class="provenance-card-header">
+                    <h3>${escapeHtml(document.source_file || "Unnamed file")}</h3>
+                    <span class="provenance-badge ${hasExplicitChain ? "provenance-badge-present" : "provenance-badge-missing"}">
+                        ${hasExplicitChain ? "Explicit custody events found" : "No explicit custody trail"}
+                    </span>
+                </div>
+                <p class="metadata-muted">${escapeHtml(provenance.note || "No provenance summary available.")}</p>
+                <div class="metadata-grid">${headerCards}</div>
+                <h4>Header Agents</h4>
+                ${agentList}
+                <h4>Custody / Preservation Events</h4>
+                ${eventList}
+                <h4>digiprovMD Summary</h4>
+                ${digiprovSummary}
+            </article>
+        `;
+    });
+
+    section.innerHTML = cards.join("");
+}
+
 function renderFilesTable(files) {
     const fileTable = $("#resultTable").DataTable();
     fileTable.clear();
@@ -151,8 +243,21 @@ function renderFilesTable(files) {
 }
 
 function renderStructureTable(files, structure) {
-    const structTable = $("#structureTable").DataTable();
-    structTable.clear();
+    const tableEl = $("#structureTable");
+
+    if ($.fn.DataTable.isDataTable(tableEl)) {
+        tableEl.DataTable().clear().destroy();
+    }
+
+    const structTable = tableEl.DataTable({
+        columns: [
+            { title: "Source METS" },
+            { title: "Map Type" },
+            { title: "Order" },
+            { title: "Division ID" },
+            { title: "File Name" }
+        ]
+    });
 
     const fileLookup = {};
     files.forEach(file => {
@@ -164,6 +269,7 @@ function renderStructureTable(files, structure) {
 
         structTable.row.add([
             item.source_file || "",
+            item.structmap_type || item.structmap_id || "",
             item.order || "",
             item.division_id || "",
             fileName || ""
@@ -171,6 +277,120 @@ function renderStructureTable(files, structure) {
     });
 
     structTable.draw();
+}
+
+function renderStructureTrees(files, documents) {
+    const section = document.getElementById("structureTreeSection");
+
+    if (!documents.length) {
+        section.innerHTML = "<p class=\"metadata-muted\">Upload a METS document to view its hierarchical structMap tree.</p>";
+        return;
+    }
+
+    const fileLookup = {};
+    files.forEach(file => {
+        fileLookup[`${file.source_file}::${file.file_id}`] = file.file_location || file.file_id || "Linked file";
+    });
+
+    section.innerHTML = documents.map(document => {
+        if (document.error) {
+            return `
+                <article class="structure-tree-card">
+                    <div class="structure-tree-header">
+                        <div>
+                            <h3>${escapeHtml(document.source_file || "Unnamed file")}</h3>
+                            <p class="metadata-muted">Tree unavailable because this METS file failed to parse.</p>
+                        </div>
+                    </div>
+                </article>
+            `;
+        }
+
+        const maps = document.structure_tree || [];
+        const mapMarkup = maps.length
+            ? maps.map((structMap, index) => renderStructMapCard(structMap, document.source_file, fileLookup, index === 0)).join("")
+            : `<p class="metadata-muted">No structMap hierarchy was found in this METS document.</p>`;
+
+        return `
+            <article class="structure-tree-card">
+                <div class="structure-tree-header">
+                    <div>
+                        <h3>${escapeHtml(document.source_file || "Unnamed file")}</h3>
+                        <p class="metadata-muted">Expandable hierarchy extracted from METS structMap.</p>
+                    </div>
+                </div>
+                <div class="structure-tree-maps">${mapMarkup}</div>
+            </article>
+        `;
+    }).join("");
+}
+
+function renderStructMapCard(structMap, sourceFile, fileLookup, expanded = false) {
+    const structMapLabel = structMap.structmap_type
+        ? `${structMap.structmap_type} structMap`
+        : (structMap.structmap_id || "structMap");
+    const roots = structMap.roots || [];
+
+    return `
+        <section class="structmap-panel ${expanded ? "is-open" : ""}">
+            <button type="button" class="structmap-toggle" aria-expanded="${expanded ? "true" : "false"}">
+                <span class="structmap-toggle-copy">
+                    <strong>${escapeHtml(structMapLabel)}</strong>
+                    <span>${escapeHtml(structMap.structmap_id || "No ID provided")} | ${roots.length} root node${roots.length === 1 ? "" : "s"}</span>
+                </span>
+                <span class="structmap-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="structmap-body">
+                ${roots.length ? `<div class="tree-root">${roots.map(root => renderTreeNode(root, sourceFile, fileLookup)).join("")}</div>` : `<p class="metadata-muted">This structMap has no divisions.</p>`}
+            </div>
+        </section>
+    `;
+}
+
+function renderTreeNode(node, sourceFile, fileLookup) {
+    const childNodes = node.children || [];
+    const linkedFiles = node.file_ids || [];
+    const hasChildren = childNodes.length > 0 || linkedFiles.length > 0;
+    const title = node.label || node.type || node.division_id || "Division";
+    const meta = [
+        node.type ? `Type: ${node.type}` : null,
+        node.order ? `Order: ${node.order}` : null,
+        node.division_id ? `ID: ${node.division_id}` : null
+    ].filter(Boolean).join(" | ");
+
+    const branchContent = [
+        childNodes.map(child => renderTreeNode(child, sourceFile, fileLookup)).join(""),
+        linkedFiles.map(fileId => renderLinkedFileNode(sourceFile, fileId, fileLookup)).join("")
+    ].filter(Boolean).join("");
+
+    return `
+        <div class="tree-node ${hasChildren ? "tree-node-branch is-open" : "tree-node-leaf"}">
+            <div class="tree-node-row ${hasChildren ? "tree-node-toggle" : ""}" ${hasChildren ? 'role="button" tabindex="0" aria-expanded="true"' : ""}>
+                ${hasChildren ? '<span class="tree-node-caret" aria-hidden="true"></span>' : '<span class="tree-node-dot" aria-hidden="true"></span>'}
+                <div class="tree-node-copy">
+                    <strong>${escapeHtml(title)}</strong>
+                    <span>${escapeHtml(meta || "No extra division metadata")}</span>
+                </div>
+            </div>
+            ${hasChildren ? `<div class="tree-node-children">${branchContent}</div>` : ""}
+        </div>
+    `;
+}
+
+function renderLinkedFileNode(sourceFile, fileId, fileLookup) {
+    const label = fileLookup[`${sourceFile}::${fileId}`] || fileId || "Linked file";
+
+    return `
+        <div class="tree-node tree-file-leaf">
+            <div class="tree-node-row">
+                <span class="tree-node-dot tree-node-dot-file" aria-hidden="true"></span>
+                <div class="tree-node-copy">
+                    <strong>${escapeHtml(label)}</strong>
+                    <span>${escapeHtml(`FILEID: ${fileId || "Unknown"}`)}</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderSummary(summary, files, structure) {
@@ -352,6 +572,26 @@ function formatGps(imageMetadata) {
     return `${imageMetadata.gps_latitude}, ${imageMetadata.gps_longitude}`;
 }
 
+function formatAgent(agent) {
+    const parts = [agent.role, agent.type, agent.other_type].filter(Boolean);
+    return parts.length ? parts.join(" | ") : "No agent role/type provided";
+}
+
+function formatEvent(event) {
+    const parts = [event.date, event.detail].filter(Boolean);
+    return parts.length ? parts.join(" | ") : "No event details provided";
+}
+
+function formatDigiprovSummary(summary) {
+    if (!summary.length) {
+        return "No structured digiprovMD details were extracted";
+    }
+
+    return summary
+        .map(item => `${item.label}: ${item.value}`)
+        .join(" | ");
+}
+
 function escapeHtml(value) {
     return String(value)
         .replaceAll("&", "&amp;")
@@ -375,14 +615,24 @@ $(document).ready(function() {
         ]
     });
 
-    $("#structureTable").DataTable();
+    $("#structureTable").DataTable({
+        columns: [
+            { title: "Source METS" },
+            { title: "Map Type" },
+            { title: "Order" },
+            { title: "Division ID" },
+            { title: "File Name" }
+        ]
+    });
 
     document.getElementById("fileInput").addEventListener("change", event => {
-        mergeSelectedFiles(event.target.files, true);
+        mergeSelectedFiles(event.target.files, false);
+        event.target.value = "";
     });
 
     document.getElementById("folderInput").addEventListener("change", event => {
         mergeSelectedFiles(event.target.files, false);
+        event.target.value = "";
     });
 
     $("#resultTable").on("click", ".metadata-trigger", function(event) {
@@ -409,4 +659,43 @@ $(document).ready(function() {
             closeMetadataModal();
         }
     });
+
+    document.getElementById("structureTreeSection").addEventListener("click", event => {
+        const mapToggle = event.target.closest(".structmap-toggle");
+        if (mapToggle) {
+            const panel = mapToggle.closest(".structmap-panel");
+            const isOpen = panel.classList.toggle("is-open");
+            mapToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            return;
+        }
+
+        const nodeToggle = event.target.closest(".tree-node-toggle");
+        if (nodeToggle) {
+            toggleTreeBranch(nodeToggle);
+        }
+    });
+
+    document.getElementById("structureTreeSection").addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") {
+            return;
+        }
+
+        const nodeToggle = event.target.closest(".tree-node-toggle");
+        if (!nodeToggle) {
+            return;
+        }
+
+        event.preventDefault();
+        toggleTreeBranch(nodeToggle);
+    });
 });
+
+function toggleTreeBranch(nodeToggle) {
+    const branch = nodeToggle.closest(".tree-node-branch");
+    if (!branch) {
+        return;
+    }
+
+    const isOpen = branch.classList.toggle("is-open");
+    nodeToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
